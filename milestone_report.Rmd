@@ -54,7 +54,7 @@ For the sake of exploration, numbers and punctuations have been consistently
 removed. This may need reconsideration before the final prototype.
 
 ```{r "data processing", cache=TRUE}
-data.path  = "../input/en_US/"
+data.path  = "../../input/en_US/"
 file.names = dir(data.path)
 file.paths = file.path(data.path, file.names)
 sizes = file.size(file.paths)
@@ -130,6 +130,8 @@ are likely to follow a distribution of a negative power
 $\text{(}P(w_i) = c w_i ^ p;\text{ for some }c, p \in R, p < -1\text{)}$, 
 thus the distribution would appear linear on a lin-log scale.
 
+Actually, Wikipedia says log-log scale.
+
 ```{r "Zipf's law", fig.width=7, fig.height=4, fig.align="center"}
 zipf.freqs = as.matrix(dtm)
 dtm.col.total = 
@@ -147,26 +149,33 @@ dtm.col.total = log10(dtm.col.total)
 
 plot(main = "Distribution of word frequency",
      ylab = "Log of occurrences",
-     xlab = "Word rank",
-     xlim = c(1, length(zipf.freqs)),
-     zipf.freqs[1, ], col = "red", type = "l")
+     xlab = "Log of word rank",
+     x = log10(1:length(zipf.freqs[1, ])),
+     y = zipf.freqs[1, ], col = "red", type = "l")
 
-lines(zipf.freqs[2, ], col = "green")
-lines(zipf.freqs[3, ], col = "blue")
-lines(dtm.col.total, col = "black")
+lines(x = log10(1:length(zipf.freqs[1, ])),
+      y = zipf.freqs[2, ], col = "green")
+lines(x = log10(1:length(zipf.freqs[1, ])),
+      y = zipf.freqs[3, ], col = "blue")
+lines(x = log10(1:length(zipf.freqs[1, ])),
+      y = dtm.col.total, col = "black")
 
 plot(main = "Frequency distribution of top ranked words",
      ylab = "Log of occurrences",
-     xlab = "Word rank",
-     xlim = c(1, length(zipf.freqs) / 100),
+     xlab = "Log of word rank",
+     xlim = c(0, log10(length(zipf.freqs[1, ])) / 3),
+     x = log10(1:length(zipf.freqs[1, ])),
      zipf.freqs[1, ], col = "red", type = "l")
 
-lines(zipf.freqs[2, ], col = "green")
-lines(zipf.freqs[3, ], col = "blue")
-lines(dtm.col.total, col = "black")
+lines(x = log10(1:length(zipf.freqs[1, ])),
+      y = zipf.freqs[2, ], col = "green")
+lines(x = log10(1:length(zipf.freqs[1, ])),
+      y = zipf.freqs[3, ], col = "blue")
+lines(x = log10(1:length(zipf.freqs[1, ])),
+      y= dtm.col.total, col = "black")
 ```
 
-While the charts do not clearly agree with this formula, words ranked below 
+The charts seem to agree with this formula, furthermore, words ranked below 
 10000 apparently occur very rarely, once in the samples.
 This potentially enables focusing on a relevant subset of a whole corpora later
 on, which is useful if only a smaller subset of e.g. a dictionary or data set 
@@ -335,9 +344,13 @@ df.dtm.2 = cbind(df.dtm.2[, 1] + df.dtm.2[, 2] + df.dtm.2[, 3], df.dtm.2)
 colnames(df.dtm.2) <- c("total", "occ1", "occ2", "occ3")
 df.dtm.2 = as.data.frame(df.dtm.2)
 df.dtm.2 = df.dtm.2[order(df.dtm.2$total, decreasing = TRUE), ]
-plot(log(df.dtm.2$total), type = "l", col = "darkgrey",
-     xlim = c(1, 200),
-     ylab = "Log of occurrences", xlab = "Rank",
+plot(x = log10(1:nrow(df.dtm.2)), 
+     y = log10(df.dtm.2$total), 
+     type = "l", 
+     col = "darkgrey",
+     xlim = c(0, log10(nrow(df.dtm.2))),
+     ylim = c(-0.5, max(log10(df.dtm.2$total))),
+     ylab = "Log of occurrences", xlab = "Log of rank",
      main = "Distribution of bigrams in the samples by rank")
 ```
 
