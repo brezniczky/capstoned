@@ -1,0 +1,412 @@
+---
+title: "Milestone Report, Word Prediction System"
+author: "Janos Brezniczky"
+date: "18 March 2016"
+output: html_document
+---
+
+#### Coursera Data Science Specialization Capstone
+
+```{r}
+# dependencies
+
+library(knitr)
+library(tm)
+library(NLP)
+library(readr)
+
+# also install: filehash
+```
+
+## 1. Summary
+
+This is an intermediate report on the capstone project, which aims to create
+some system that accelerates user input e.g. on mobile devices by offering 
+options as the next word while the user is typing. I expect this project to
+finish with a ground-up prototype of a realistic predictive engine.
+
+The language the solution works in is up to the student, I expect to choose the 
+(I assume fairly typical) US English.
+
+This search for a solution cannot aim to be exhaustive -- for instance using 
+someone else's service is not really an option when demonstrating skills, however 
+definitely is a possibility in reality.
+
+The two most promising predictive strategies are covered here, namely
+
+* using a vocabulary to predict words (i.e. predicting while ignoring the context)
+* leveraging the knowledge of a preceding word (using bigrams)
+
+As it is also useful to verify/construct hypotheses using a smaller subset before 
+expanding the scope of discussion, the examinations are restricted to two word
+structures, longer ones may be considered at a later stage.
+
+## 2. Introducing the data set
+
+For this project, a set of 3 files was [provided](https://eventing.coursera.org/api/redirectStrict/Nj8snifhv3-FC2rzb11MgOcihhVx3nDwDOW4RX2Q7XQW7AHjp2xRhJK-Zq5FSWRHNbbzJoFzf0jHuBN4KvkLVA.PmAafTLQ4d5DoiLq5_FE0g.U7Pg_6RscXUwxpHwM4N7Ni_nYZwb6D6OEqwt7itM6wnk0xZTvIQCI3HUDhMv1tdgTYk4CWrqeka6qJD_NKelM9zZ6jkwBcBr_ndono6tkz-SxHo4TLk77SAyff12wdnjHKxcEqlp_Tj8GnYoBMxjBFZMZxdEt1pa8m-ll8c83mJYDTCNGHE4qYVBvoQzFvvtDIICjTcrx212Y9L3ghN-JlGbRQjIv_6rLKDzoY1_AQDuGOnQT89M4NmAuqLAwFzos-iUin2ZTAMaSC9CoCr0HcycooFVg0onhR8BJoyLFiMrSY06nsiLcF9vzulvFc6kJ32cFvQae5bMPy9Mhtd1j-YpyK8waf0FkDnlzPXwbnD819qJFRlDGANV86dE9iGNc1xmTr-D7slkf6z59Kg_pi0wST7sn50FZaGUO5lLDn0). 
+These encompass a large corpus of (US) English words, containing hundreds of 
+megabytes of data. The sources are summarized below based on subsamples. 
+Subsampling allows for the processing to take place quickly despite the sheer 
+size of the data (and R's notoriously bad reputation at scaling up to large data 
+sets).
+
+For the sake of exploration, numbers and punctuations have been consistently 
+removed. This may need reconsideration before the final prototype.
+
+```{r "data processing", cache=TRUE}
+data.path  = "../input/en_US/"
+file.names = dir(data.path)
+file.paths = file.path(data.path, file.names)
+sizes = file.size(file.paths)
+
+# prepare for reproducible random subsampling
+set.seed(0)
+# read up the files
+lines = rep(NA, 3)
+line.counts = rep(NA, 3)
+sample.lines = c(3000, 3000 * 1.05, 9000)
+for(i in 1:3) {
+  text = readLines(file.paths[i], -1)
+  line.counts[i] = length(text)
+  # use a small, random sample of the data as 
+  # text manipulation gets slow otherwise
+  is.selected = sample(x = length(text), size = sample.lines[i])
+  text = text[is.selected]
+  # the text will be more useful as a single character
+  text = paste0(text, collapse = " ")
+  
+  lines[i] = text
+}
+
+# prepare for text mining
+corp = Corpus(VectorSource(lines))
+inspect(corp)
+
+cl.corp = tm_map(corp, stripWhitespace)
+cl.corp = tm_map(cl.corp, content_transformer(tolower))
+cl.corp = tm_map(cl.corp, removePunctuation)
+cl.corp = tm_map(cl.corp, removeNumbers)
+cl.corp = tm_map(cl.corp, stemDocument)
+# currently stopwords are not removed
+# cl.corp = tm_map(cl.corp, removeWords, stopwords("english"))
+dtm = DocumentTermMatrix(cl.corp)
+
+rm(corp)
+rm(lines)
+```
+
+```{r "data set summary table"}
+
+full.to.sample = line.counts / sample.lines
+
+kable(
+  caption = "Data set summary table (words are stemmed)",
+  align = c("l", "r", "r", "r", "r", "r", "r"),
+  col.names = c("File", "File Size (MB)", "Lines (k)", 
+                "Word Count (est. total, k)", "Sampling Ratio", 
+                "Word Count (sample)",
+                "Unique Words (sample)"),
+  data.frame(file.names, 
+             round(sizes / 1024 / 1024, digits = 2),
+             round(line.counts / 1000),
+             round(apply(as.matrix(dtm), MARGIN = 1, FUN = sum)
+                   * full.to.sample / 1000),
+             sprintf("%.2f %%", 1 / full.to.sample * 100),
+             apply(as.matrix(dtm), MARGIN = 1, FUN = sum),
+             apply(as.matrix(dtm), MARGIN = 1, FUN = function(x) sum(x != 0)))
+)
+```
+
+## 3. Exploratory analysis of words
+
+### 3.1. Word distribution
+
+Based on this table the diversity of the language seems to be the highest in the
+news corpus, while Twitter messages and blog posts possibly repeat somewhat more 
+of the phrases. Nevertheless, there seems no huge difference there.
+
+[Zipf's law](https://en.wikipedia.org/wiki/Zipf's_law) states that the words 
+are likely to follow a distribution of a negative power 
+$\text{(}P(w_i) = c w_i ^ p;\text{ for some }c, p \in R, p < -1\text{)}$, 
+thus the distribution would appear linear on a lin-log scale.
+
+```{r "Zipf's law", fig.width=7, fig.height=4, fig.align="center"}
+zipf.freqs = as.matrix(dtm)
+dtm.col.total = 
+  zipf.freqs[1, ] + 
+  zipf.freqs[2, ] + 
+  zipf.freqs[3, ] # likely to be faster than apply()
+
+for(i in 1:nrow(zipf.freqs)) {
+  zipf.freqs[i, ] = sort(zipf.freqs[i, ], decreasing = TRUE)
+}
+dtm.col.total = sort(dtm.col.total, decreasing = TRUE)
+
+zipf.freqs = log10(zipf.freqs)
+dtm.col.total = log10(dtm.col.total)
+
+plot(main = "Distribution of word frequency",
+     ylab = "Log of occurrences",
+     xlab = "Word rank",
+     xlim = c(1, length(zipf.freqs)),
+     zipf.freqs[1, ], col = "red", type = "l")
+
+lines(zipf.freqs[2, ], col = "green")
+lines(zipf.freqs[3, ], col = "blue")
+lines(dtm.col.total, col = "black")
+
+plot(main = "Frequency distribution of top ranked words",
+     ylab = "Log of occurrences",
+     xlab = "Word rank",
+     xlim = c(1, length(zipf.freqs) / 100),
+     zipf.freqs[1, ], col = "red", type = "l")
+
+lines(zipf.freqs[2, ], col = "green")
+lines(zipf.freqs[3, ], col = "blue")
+lines(dtm.col.total, col = "black")
+```
+
+While the charts do not clearly agree with this formula, words ranked below 
+10000 apparently occur very rarely, once in the samples.
+This potentially enables focusing on a relevant subset of a whole corpora later
+on, which is useful if only a smaller subset of e.g. a dictionary or data set 
+needs to be distributed over to a potentially less capable mobile device.
+
+The feasibility of this can be confirmed by looking at how many occurrences some 
+top words account for in total.
+
+```{r "occurrences by top words", fig.width=7, fig.height=4, fig.align="center"}
+plot.occurrence.chart = function(freqs, main, pos.2 = 4) {
+  freqs = sort(freqs, decreasing = TRUE)
+  total.words = sum(freqs)
+  cumsum.freqs = cumsum(freqs)
+  
+  plot(main = main,
+       xlab = "Last rank included",
+       ylab = "Occurrences (%)",
+       xlim = c(1, length(cumsum.freqs)),
+       cumsum.freqs / total.words * 100, 
+       type = "l",
+       col = "darkgrey")
+  abline(a = c(90, 0), col = "grey", lty = 2)
+  rank.90.perc = min(which(cumsum.freqs > total.words * 0.9))
+  abline(v = rank.90.perc, col = "grey", lty = 2)
+  text(x = rank.90.perc, y = 90, pos = pos.2,
+       sprintf("90%% of the text samples is covered\nby the top %d", rank.90.perc))
+  
+  rank.50.perc = min(which(cumsum.freqs > total.words * 0.5))
+  abline(a = c(50, 0), col = "grey", lty = 3)
+  abline(v = rank.50.perc, col = "grey", lty = 3)
+  text(x = rank.50.perc, y = 50, pos = 4,
+       sprintf("50%% of the text samples is covered\nby the top %d", rank.50.perc))
+  
+  return(list(rank.50.perc = rank.50.perc, rank.90.perc = rank.90.perc))
+}
+
+freqs = as.matrix(dtm)
+freqs = freqs[1, ] + freqs[2, ] + freqs[3, ]
+freq.quantiles = 
+  plot.occurrence.chart(freqs, "Occurrences covered by top n (stemmed) words")
+
+```
+
+This figure confirms that a relatively small proportion 
+(`r round(100 * freq.quantiles$rank.90.perc/length(freqs), 2)` % in the sample) 
+suffices to cover 9 out of 10 words the user may type in. If we are pleased with 
+having only 50% of the words covered, a handful of words 
+(`r round(100 * freq.quantiles$rank.50.perc/length(freqs), 2)` %) will suffice.
+
+The top words look promising, although are expected to be stopwords:
+
+```{r}
+library(stringi)
+
+df.dtm = t(as.matrix(dtm))
+df.dtm = cbind(df.dtm[, 1] + df.dtm[, 2] + df.dtm[, 3], df.dtm)
+df.dtm = 
+  data.frame(
+#    failed to make kable display backslashes in HTML
+#    raw = gsub("[\\]", "\\\\\\", stri_escape_unicode(rownames(df.dtm))),
+
+    raw = gsub("[\\]", " ", stri_escape_unicode(rownames(df.dtm))),
+    df.dtm
+  )
+colnames(df.dtm) = c("Raw", "Total", "occ1", "occ2", "occ3") 
+
+kable(x = head(df.dtm[order(df.dtm$Total, decreasing = TRUE), ], 20), 
+      caption = "Most frequent words", 
+      col.names = c("Raw", "Total", file.names))
+```
+
+### 3.2. Further cleaning of the data
+
+The vocabulary analyzed currently contains things that may be unnecessary or 
+unwanted among the predictions. These may include vulgar/foreign expressions, 
+emoticons, etc. alongside the rarer ones.
+
+One way to improve on this is restricting our examinations to the aforementioned
+most frequent minority of the text elements.
+
+As an example, the first elements contain emoticons:
+
+```{r "words in doc. term. matrix"}
+kable(
+  col.names = c("Raw", "Total", "Freq.1", "Freq.2", "Freq.3"),
+  x = head(df.dtm, 10)
+)
+```
+
+Unless creating a context-specific system (which can be later made a goal), to
+initially stay with a simpler approach, the data set can also be restricted to 
+those linguistic units which appear in all 3 of the corpora. This can be useful 
+since some phrases seem to rarely appear outside/within certain contexts.
+
+This would have already filtered out the aforementioned problematic first 
+entries. Swearwords also seem very unfrequent in blog entries. However, the lack
+of presence in each of the documents can be due to the sparsity of the sampling.
+
+### 3.3. Leveraging stemming - 2 phases?
+
+Also while it wasn't heavily emphasized, the words were considered in a stemmed 
+form. This made a smaller sample denser on the distribution side thus 
+helping the analysis, but also can allow for an initial narrowing down of the 
+choices with a two-phase prediction method. 
+Offering the user a smaller subset: incomplete predictions can also speed entry
+up. For example, after they typed "ac", and have been offered with and 
+selected _academi_, they can be presented with likely endings of that stem, 
+e.g. _academia_, _academic_ etc..
+
+#### 3.3.1. "albuquerqu"
+
+Some of the word stems, however, may have an unequivocal continuation (at least
+concluding from the available corpora). It means in that case the stem is 
+likely to be unnecessarily offered. An example identified is _albuquerqu_ .
+
+### 3.4. About changes over time
+
+Languages change continuously and good prediction algorithms should reflect
+their nature. One thing to note is a static data set cannot adhere to this.
+
+#### 3.4.1. Adaptive data sets
+
+One way to address this is adapting the data set continuously along with the
+experienced user input. This also allows to adapt to the user-specific 
+vocabulary.
+
+Another way is to distribute data set updates e.g. via the web.
+
+#### 3.4.2. Choice of core vocabulary
+
+On another hand, when looking for the core set of expressions to wrap up in a
+conveniently small package, being time-tested could form a basis for preference.
+Stemming can also help here, or coincide with this filter - words from time to 
+time get constructed from existing stems, and stems are more persistent and 
+constant elements of a language.
+
+### 3.5. Casing
+
+As leading words of sentences are capitalized they should be treated case 
+insensitively (i.e. as if their casing was unknown) when harvesting data, or 
+completely ignored.
+
+## 4. Exploring more complex structures
+
+### 4.1. Bigrams
+
+For prediction, it can be useful to know whether bigrams, which are two-word 
+sequences in a text, have a certain uneven distribution. Intiuitively this is
+very likely to happen.
+
+The words most likely to follow a given one, _w_, may be the ones to display at 
+the top of a list of suggestions once _w_ has been entered. These are, in other
+words, the ones with the highest probability conditional on being preceded by 
+_w_.
+
+```{r "bigram generation", cache=TRUE, fig.width=7, fig.height=4, fig.align="center"}
+# based on http://tm.r-forge.r-project.org/faq.html
+BigramTokenizer <-
+  function(x)
+    unlist(lapply(ngrams(words(x), 2), paste, collapse = " "), use.names = FALSE)
+
+dtm.2 <- TermDocumentMatrix(cl.corp, control = list(tokenize = BigramTokenizer))
+
+df.dtm.2 = as.matrix(dtm.2)
+df.dtm.2 = cbind(df.dtm.2[, 1] + df.dtm.2[, 2] + df.dtm.2[, 3], df.dtm.2)
+colnames(df.dtm.2) <- c("total", "occ1", "occ2", "occ3")
+df.dtm.2 = as.data.frame(df.dtm.2)
+df.dtm.2 = df.dtm.2[order(df.dtm.2$total, decreasing = TRUE), ]
+plot(log(df.dtm.2$total), type = "l", col = "darkgrey",
+     xlim = c(1, 200),
+     ylab = "Log of occurrences", xlab = "Rank",
+     main = "Distribution of bigrams in the samples by rank")
+```
+
+The distribution is very similar to that of the words. 
+
+```{r fig.width=7, fig.height=4, fig.align="center"}
+quantiles = 
+  plot.occurrence.chart(df.dtm.2$total, 
+                        "Occurrences covered by top n (stemmed) bigrams",
+                        pos.2 = 2)
+```
+
+Since stopword removal is not part of the data processing, the top bigrams are 
+expected expected to contain these:
+
+```{r}
+kable(x = head(df.dtm.2, 20), caption = "Most frequent bigrams", 
+      col.names = c("Total", file.names))
+```
+
+## 5. Summary
+
+### 5.1. "Questions to consider"
+
+The set of questions to consider was:
+
+* "1. Some words are more frequent than others - what are the distributions of word frequencies?"
+* "2. What are the frequencies of 2-grams and 3-grams in the dataset?"
+* "3. How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?"
+* "4. How do you evaluate how many of the words come from foreign languages?"
+* "5. Can you think of a way to increase the coverage -- identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases?"
+
+Question 1-3 have been addressed above.
+
+#### 5.1.1. Question 4.
+#### How do you evaluate how many of the words come from foreign languages?”
+
+Some things cannot be detected. Certain words concide in terms of spelling, yet
+mean different things in different languages. Some are as easy as filtering out 
+Unicode characters. I expect there are strategies but no 100% accurate solutions
+for this.
+
+In short, at least one easy step to identify such words is to look out for 
+Unicode characters - today's English words do not contain these.
+
+Another good option is to obtain an English dictionary/thesaurus and verify 
+against them, probably there are some freely avaialble ones out there.
+
+#### 5.1.2. Question 5.
+#### "Can you think of a way to increase the coverage..."
+
+Categorizing the word endings, i.e. those which suffix the stems, may put the 
+words into such groups that the likely continuations can be concluded from them.
+In this case, the words can be continued with the ending of some other word 
+which belongs to the same group.
+This may not need to happen in the two phases mentioned above - a small set of
+choices implies no need for this.
+
+Knowing whether a word is a verb, adjective or noun can also be helpful. Certain
+verbs are often followed by a likely subset of stopwords (e.g. "want to", 
+"applies to", etc.). Such relationships are easier to evaluate using a 
+non-stemmed dataset.
+
+### 5.2. Closing words
+
+Probably enough of the difficulties with the project have been outlined in the
+above to start effectively working on it. Extracting the words, bigrams from
+larger corpora, perhaps trigrams, addressing casing issues, potential 
+performance problems (for not necessarily pure R solutions it should not be a 
+problem to process some hundreds of megabytes of data), filtering words, 
+researching dictionaries, restricting suggestions are plenty of tasks to proceed 
+with. 
