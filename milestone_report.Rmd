@@ -2,7 +2,7 @@
 title: "Milestone Report, Word Prediction System"
 author: "Janos Brezniczky"
 date: "18 March 2016"
-output: html_document
+output: md_document
 ---
 
 #### Coursera Data Science Specialization Capstone
@@ -14,8 +14,6 @@ library(knitr)
 library(tm)
 library(NLP)
 library(readr)
-
-# TEST MODIFICATION LINE
 
 # also install: filehash
 ```
@@ -227,7 +225,7 @@ suffices to cover 9 out of 10 words the user may type in. If we are pleased with
 having only 50% of the words covered, a handful of words 
 (`r round(100 * freq.quantiles$rank.50.perc/length(freqs), 2)` %) will suffice.
 
-The top words look promising, although are expected to be stopwords:
+The top words look promising, although there are expected to be stopwords:
 
 ```{r}
 library(stringi)
@@ -273,7 +271,7 @@ those linguistic units which appear in all 3 of the corpora. This can be useful
 since some phrases seem to rarely appear outside/within certain contexts.
 
 This would have already filtered out the aforementioned problematic first 
-entries. Swearwords also seem very unfrequent in blog entries. However, the lack
+entries. Swearwords also seem very infrequent in blog entries. However, the lack
 of presence in each of the documents can be due to the sparsity of the sampling.
 
 ### 3.3. Leveraging stemming - 2 phases?
