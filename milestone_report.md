@@ -232,7 +232,7 @@ Actually, Wikipedia says log-log scale.
     lines(x = log10(1:length(zipf.freqs[1, ])),
           y = dtm.col.total, col = "black")
 
-<img src="milestone_report_files/figure-markdown_strict/Zipf's law-1.png" title="" alt="" style="display: block; margin: auto;" />
+<img src="milestone_report_files/figure-markdown_strict/Zipf_s_law-1.png" title="" alt="" style="display: block; margin: auto;" />
 
     plot(main = "Frequency distribution of top ranked words",
          ylab = "Log of occurrences",
@@ -248,7 +248,7 @@ Actually, Wikipedia says log-log scale.
     lines(x = log10(1:length(zipf.freqs[1, ])),
           y= dtm.col.total, col = "black")
 
-<img src="milestone_report_files/figure-markdown_strict/Zipf's law-2.png" title="" alt="" style="display: block; margin: auto;" />
+<img src="milestone_report_files/figure-markdown_strict/Zipf_s_law-2.png" title="" alt="" style="display: block; margin: auto;" />
 
 The charts seem to agree with this formula, furthermore, words ranked
 below 10000 apparently occur very rarely, once in the samples. This
@@ -273,6 +273,7 @@ occurrences some top words account for in total.
            type = "l",
            col = "darkgrey")
       abline(a = c(90, 0), col = "grey", lty = 2)
+
       rank.90.perc = min(which(cumsum.freqs > total.words * 0.9))
       abline(v = rank.90.perc, col = "grey", lty = 2)
       text(x = rank.90.perc, y = 90, pos = pos.2,
@@ -292,7 +293,7 @@ occurrences some top words account for in total.
     freq.quantiles = 
       plot.occurrence.chart(freqs, "Occurrences covered by top n (stemmed) words")
 
-<img src="milestone_report_files/figure-markdown_strict/occurrences by top words-1.png" title="" alt="" style="display: block; margin: auto;" />
+<img src="milestone_report_files/figure-markdown_strict/occurrences_by_top_words-1.png" title="" alt="" style="display: block; margin: auto;" />
 
 This figure confirms that a relatively small proportion (20.57 % in the
 sample) suffices to cover 9 out of 10 words the user may type in. If we
@@ -507,6 +508,11 @@ aforementioned most frequent minority of the text elements.
 
 As an example, the first elements contain emoticons:
 
+<!-- 
+  still can't figure out how to embed Unicode characters in a PDF output, so
+  only markdown and HTML can be provided
+-->
+    # row.names(df.dtm) <- 1:nrow(df.dtm) # for PDF output only
     kable(
       col.names = c("Raw", "Total", "Freq.1", "Freq.2", "Freq.3"),
       x = head(df.dtm, 10)
@@ -699,7 +705,7 @@ conditional on being preceded by *w*.
          ylab = "Log of occurrences", xlab = "Log of rank",
          main = "Distribution of bigrams in the samples by rank")
 
-<img src="milestone_report_files/figure-markdown_strict/bigram generation-1.png" title="" alt="" style="display: block; margin: auto;" />
+<img src="milestone_report_files/figure-markdown_strict/bigram_generation-1.png" title="" alt="" style="display: block; margin: auto;" />
 
 The distribution is very similar to that of the words.
 
@@ -893,7 +899,7 @@ Question 1-3 have been addressed above.
 
 #### 5.1.1. Question 4.
 
-#### How do you evaluate how many of the words come from foreign languages?”
+#### "How do you evaluate how many of the words come from foreign languages?”
 
 Some things cannot be detected. Certain words concide in terms of
 spelling, yet mean different things in different languages. Some are as

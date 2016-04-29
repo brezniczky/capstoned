@@ -2,7 +2,7 @@
 title: "Milestone Report, Word Prediction System"
 author: "Janos Brezniczky"
 date: "18 March 2016"
-output: md_document
+output: html_document
 ---
 
 #### Coursera Data Science Specialization Capstone
@@ -132,7 +132,7 @@ thus the distribution would appear linear on a lin-log scale.
 
 Actually, Wikipedia says log-log scale.
 
-```{r "Zipf's law", fig.width=7, fig.height=4, fig.align="center"}
+```{r "Zipf_s_law", fig.width=7, fig.height=4, fig.align="center"}
 zipf.freqs = as.matrix(dtm)
 dtm.col.total = 
   zipf.freqs[1, ] + 
@@ -184,7 +184,7 @@ needs to be distributed over to a potentially less capable mobile device.
 The feasibility of this can be confirmed by looking at how many occurrences some 
 top words account for in total.
 
-```{r "occurrences by top words", fig.width=7, fig.height=4, fig.align="center"}
+```{r "occurrences_by_top_words", fig.width=7, fig.height=4, fig.align="center"}
 plot.occurrence.chart = function(freqs, main, pos.2 = 4) {
   freqs = sort(freqs, decreasing = TRUE)
   total.words = sum(freqs)
@@ -198,6 +198,7 @@ plot.occurrence.chart = function(freqs, main, pos.2 = 4) {
        type = "l",
        col = "darkgrey")
   abline(a = c(90, 0), col = "grey", lty = 2)
+
   rank.90.perc = min(which(cumsum.freqs > total.words * 0.9))
   abline(v = rank.90.perc, col = "grey", lty = 2)
   text(x = rank.90.perc, y = 90, pos = pos.2,
@@ -258,7 +259,12 @@ most frequent minority of the text elements.
 
 As an example, the first elements contain emoticons:
 
-```{r "words in doc. term. matrix"}
+<!-- 
+  still can't figure out how to embed Unicode characters in a PDF output, so
+  only markdown and HTML can be provided
+-->
+```{r "words_in_doc_term_matrix"}
+# row.names(df.dtm) <- 1:nrow(df.dtm) # for PDF output only
 kable(
   col.names = c("Raw", "Total", "Freq.1", "Freq.2", "Freq.3"),
   x = head(df.dtm, 10)
@@ -331,7 +337,7 @@ the top of a list of suggestions once _w_ has been entered. These are, in other
 words, the ones with the highest probability conditional on being preceded by 
 _w_.
 
-```{r "bigram generation", cache=TRUE, fig.width=7, fig.height=4, fig.align="center"}
+```{r "bigram_generation", cache=TRUE, fig.width=7, fig.height=4, fig.align="center"}
 # based on http://tm.r-forge.r-project.org/faq.html
 BigramTokenizer <-
   function(x)
@@ -386,7 +392,7 @@ The set of questions to consider was:
 Question 1-3 have been addressed above.
 
 #### 5.1.1. Question 4.
-#### How do you evaluate how many of the words come from foreign languages?”
+#### "How do you evaluate how many of the words come from foreign languages?”
 
 Some things cannot be detected. Certain words concide in terms of spelling, yet
 mean different things in different languages. Some are as easy as filtering out 
