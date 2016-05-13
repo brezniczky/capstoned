@@ -1,0 +1,31 @@
+.row, html {
+  background-color: #888888;
+}
+
+h3 {
+  color: #444444;
+  font-size: 17px;
+  font-weight: bold;
+}
+
+h4, h5 {
+  color: #444444;
+}
+
+.btn {
+  color: #000000;
+  background-color: #eeeeee;
+}
+
+.btn:hover {
+  background-color: #dddddd;
+}
+
+.btn:active {
+  background-color: #888800;
+}
+
+#userText {
+  color: #000000;
+  background-color: #dddddd;
+}

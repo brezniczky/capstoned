@@ -935,15 +935,6 @@ test_associations = function() {
 
   print(res)
 
-# TODO: redundant case!
-  res =
-    get_associations_cpp(
-      text = "hello world. an apple is as savoury as a lemon sometimes. life is live.",
-      excluded_words = c("is", "an", "as", "a"),
-      enabled_words = "",
-      use_enabled_words = FALSE,
-      csv_filenames = "")
-
   print(res)
 
   res =
